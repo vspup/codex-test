@@ -12,7 +12,7 @@ from electabuzz_client import (
     EB_TYPE_UNKOWN,
 )
 from datapoint_mapping import DATA_POINT_MAPPING
-from constants import cfg
+from config.core import cfg
 
 TYPE_MAP = {
     "EB_TYPE_FLOAT": EB_TYPE_FLOAT,
@@ -112,7 +112,12 @@ async def handle_connection(reader, writer, client):
 async def main():
     print(f">> Connecting to controller {cfg.host}:{cfg.port} ...")
     client = Client()
-    await client.connect(cfg.host, cfg.port, recv_timeout_ms=cfg.recv_timeout_ms)
+    await client.connect(
+        cfg.host,
+        cfg.port,
+        recv_timeout_ms=cfg.recv_timeout_ms,
+        timeout=cfg.connect_timeout_s,
+    )
     print(f">> Connected to {cfg.host}:{cfg.port}")
 
     server = await asyncio.start_server(

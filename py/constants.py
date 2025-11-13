@@ -1,6 +1,10 @@
-# Minimal constants for Electabuzz project
+"""Backwards compatibility layer for legacy imports.
 
-class cfg:
-    host = "mps.local"  # Change to IP if needed
-    port = 5554
-    recv_timeout_ms = 500
+Prefer importing :mod:`config.core` directly. This module simply re-exports
+the shared configuration instance as ``cfg`` so that older scripts keep
+working while the codebase migrates to the new package layout.
+"""
+
+from config.core import cfg  # noqa: F401
+
+__all__ = ["cfg"]

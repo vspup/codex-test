@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import asyncio
 import electabuzz_client as ebc
-from constants import cfg
+
+from config.core import cfg
 from network_utils import connect_to_device
 from datapoint_mapping import DATA_POINT_MAPPING
 from electabuzz_client import *
