@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
 import asyncio
-import electabuzz_client as ebc
-from constants import cfg
-from network_utils import connect_to_device
-from datapoint_mapping import DATA_POINT_MAPPING
-from electabuzz_client import *
+import os
+import readline
+import sys
+from pathlib import Path
 
-import readline, os, atexit
+if __package__ is None or __package__ == "":
+    PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+    if str(PACKAGE_ROOT) not in sys.path:
+        sys.path.append(str(PACKAGE_ROOT))
+    from core import electabuzz_client as ebc  # type: ignore  # noqa: E402
+    from core.constants import cfg  # type: ignore  # noqa: E402
+    from core.datapoint_mapping import DATA_POINT_MAPPING  # type: ignore  # noqa: E402
+    from core.network_utils import connect_to_device  # type: ignore  # noqa: E402
+else:
+    from ..core import electabuzz_client as ebc
+    from ..core.constants import cfg
+    from ..core.datapoint_mapping import DATA_POINT_MAPPING
+    from ..core.network_utils import connect_to_device
+
+import atexit
 
 HISTORY_FILE = os.path.expanduser("~/.id_transmiter_history")
 if os.path.exists(HISTORY_FILE):
@@ -39,14 +52,14 @@ readline.set_completer(completer)
 readline.parse_and_bind('tab: complete')
 
 TYPE_MAP = {
-    'EB_TYPE_FLOAT': EB_TYPE_FLOAT,
-    'EB_TYPE_DOUBLE': EB_TYPE_DOUBLE,
-    'EB_TYPE_UINT16': EB_TYPE_UINT16,
-    'EB_TYPE_UINT32': EB_TYPE_UINT32,
-    'EB_TYPE_INT32': EB_TYPE_INT32,
-    'EB_TYPE_INT8': EB_TYPE_INT8,
-    'EB_TYPE_BOOL': EB_TYPE_BOOL,
-    'EB_TYPE_UNKOWN': EB_TYPE_UNKOWN,
+    'EB_TYPE_FLOAT': ebc.EB_TYPE_FLOAT,
+    'EB_TYPE_DOUBLE': ebc.EB_TYPE_DOUBLE,
+    'EB_TYPE_UINT16': ebc.EB_TYPE_UINT16,
+    'EB_TYPE_UINT32': ebc.EB_TYPE_UINT32,
+    'EB_TYPE_INT32': ebc.EB_TYPE_INT32,
+    'EB_TYPE_INT8': ebc.EB_TYPE_INT8,
+    'EB_TYPE_BOOL': ebc.EB_TYPE_BOOL,
+    'EB_TYPE_UNKOWN': ebc.EB_TYPE_UNKOWN,
 }
 
 
@@ -79,7 +92,7 @@ async def write_point(client, hex_id, values):
         dp_id = int(hex_id, 16)
         point = f"0x{dp_id:04x}"
         type_str = DATA_POINT_MAPPING.get(point, {}).get("type", "EB_TYPE_FLOAT")
-        eb_type = TYPE_MAP.get(type_str, EB_TYPE_UNKOWN)
+        eb_type = TYPE_MAP.get(type_str, ebc.EB_TYPE_UNKOWN)
 
         # 🟢 Proper type handling
         if type_str == 'EB_TYPE_BOOL':

@@ -1,28 +1,28 @@
 import asyncio
-from electabuzz_client import (
-    Client,
-    EbResult,
-    EB_TYPE_BOOL,
-    EB_TYPE_DOUBLE,
-    EB_TYPE_FLOAT,
-    EB_TYPE_INT32,
-    EB_TYPE_INT8,
-    EB_TYPE_UINT16,
-    EB_TYPE_UINT32,
-    EB_TYPE_UNKOWN,
-)
-from datapoint_mapping import DATA_POINT_MAPPING
-from constants import cfg
+import sys
+from pathlib import Path
+
+if __package__ is None or __package__ == "":
+    PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+    if str(PACKAGE_ROOT) not in sys.path:
+        sys.path.append(str(PACKAGE_ROOT))
+    from core import electabuzz_client as ebc  # type: ignore  # noqa: E402
+    from core.constants import cfg  # type: ignore  # noqa: E402
+    from core.datapoint_mapping import DATA_POINT_MAPPING  # type: ignore  # noqa: E402
+else:
+    from ..core import electabuzz_client as ebc
+    from ..core.constants import cfg
+    from ..core.datapoint_mapping import DATA_POINT_MAPPING
 
 TYPE_MAP = {
-    "EB_TYPE_FLOAT": EB_TYPE_FLOAT,
-    "EB_TYPE_DOUBLE": EB_TYPE_DOUBLE,
-    "EB_TYPE_UINT16": EB_TYPE_UINT16,
-    "EB_TYPE_UINT32": EB_TYPE_UINT32,
-    "EB_TYPE_INT32": EB_TYPE_INT32,
-    "EB_TYPE_INT8": EB_TYPE_INT8,
-    "EB_TYPE_BOOL": EB_TYPE_BOOL,
-    "EB_TYPE_UNKOWN": EB_TYPE_UNKOWN,
+    "EB_TYPE_FLOAT": ebc.EB_TYPE_FLOAT,
+    "EB_TYPE_DOUBLE": ebc.EB_TYPE_DOUBLE,
+    "EB_TYPE_UINT16": ebc.EB_TYPE_UINT16,
+    "EB_TYPE_UINT32": ebc.EB_TYPE_UINT32,
+    "EB_TYPE_INT32": ebc.EB_TYPE_INT32,
+    "EB_TYPE_INT8": ebc.EB_TYPE_INT8,
+    "EB_TYPE_BOOL": ebc.EB_TYPE_BOOL,
+    "EB_TYPE_UNKOWN": ebc.EB_TYPE_UNKOWN,
 }
 
 
@@ -80,14 +80,14 @@ async def handle_connection(reader, writer, client):
                 dp = int(parts[1], 16)
                 point_key = f"0x{dp:04x}"
                 type_name = DATA_POINT_MAPPING.get(point_key, {}).get("type", "EB_TYPE_DOUBLE")
-                eb_type = TYPE_MAP.get(type_name, EB_TYPE_UNKOWN)
+                eb_type = TYPE_MAP.get(type_name, ebc.EB_TYPE_UNKOWN)
                 try:
                     value = _convert_value_for_type(type_name, parts[2:])
                 except ValueError as exc:
                     response = f"<<< Invalid value for {type_name}: {exc}\n"
                 else:
                     res = await client.single_write(dp, value, eb_type=eb_type)
-                    if res == EbResult.EB_OK:
+                    if res == ebc.EbResult.EB_OK:
                         response = f"<<< WROTE 0x{dp:04X} = {value} ({res.name})\n"
                     elif res is None:
                         response = f"<<< WROTE 0x{dp:04X} = {value} (no response)\n"
@@ -111,7 +111,7 @@ async def handle_connection(reader, writer, client):
 
 async def main():
     print(f">> Connecting to controller {cfg.host}:{cfg.port} ...")
-    client = Client()
+    client = ebc.Client()
     await client.connect(cfg.host, cfg.port, recv_timeout_ms=cfg.recv_timeout_ms)
     print(f">> Connected to {cfg.host}:{cfg.port}")
 

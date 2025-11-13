@@ -26,26 +26,32 @@ HIOKI_RANGE = "1" # Диапазон измерения Hioki DM7275 (напри
 
 # === END CONFIG ===
 
-import sys
 import asyncio
-import electabuzz_client as ebc
-from constants import cfg
-from network_utils import connect_to_device
-from datapoint_mapping import DATA_POINT_MAPPING
-from typing import Optional
-import signal
-import serial
 import csv
+import signal
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
-import time
+from typing import Optional
 
-from dm7275 import connect_dm7275, read_voltage
+import serial
 
-
-from electabuzz_client import EB_TYPE_BOOL
-from electabuzz_client import EB_TYPE_UINT32
-from electabuzz_client import EB_TYPE_DOUBLE
+if __package__ is None or __package__ == "":
+    PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+    if str(PACKAGE_ROOT) not in sys.path:
+        sys.path.append(str(PACKAGE_ROOT))
+    from core import electabuzz_client as ebc  # type: ignore  # noqa: E402
+    from core.constants import cfg  # type: ignore  # noqa: E402
+    from core.datapoint_mapping import DATA_POINT_MAPPING  # type: ignore  # noqa: E402
+    from core.network_utils import connect_to_device  # type: ignore  # noqa: E402
+    from edge.dm7275 import connect_dm7275, read_voltage  # type: ignore  # noqa: E402
+else:
+    from ..core import electabuzz_client as ebc
+    from ..core.constants import cfg
+    from ..core.datapoint_mapping import DATA_POINT_MAPPING
+    from ..core.network_utils import connect_to_device
+    from .dm7275 import connect_dm7275, read_voltage
 
 
 DP_PM_FUSE = 0x3107
@@ -202,7 +208,7 @@ async def read_datapoint(client: ebc.Client, dp_id: int) -> Optional[any]:
 async def enable_all_pm_modules(client: ebc.Client) -> bool:
     """Sends [True]*8 to 0x3107 to enable all PM modules."""
     try:
-        result = await client.single_write(DP_PM_FUSE, [True] * 8, EB_TYPE_BOOL)
+        result = await client.single_write(DP_PM_FUSE, [True] * 8, ebc.EB_TYPE_BOOL)
         if result == ebc.EbResult.EB_OK:
             print(">> Sent enable command to all PM modules via 0x3107.")
             return True
@@ -225,7 +231,7 @@ async def switch_main_mode(client: ebc.Client, target_mode: int, timeout: float 
 
     try:
         print(f">> Sending command: w 0x{DP_REQ_MODE:04X} {target_mode}")
-        result = await client.single_write(DP_REQ_MODE, target_mode, EB_TYPE_UINT32)
+        result = await client.single_write(DP_REQ_MODE, target_mode, ebc.EB_TYPE_UINT32)
         if result != ebc.EbResult.EB_OK:
             print(f"!! Failed to write to {DP_REQ_MODE}. Code: {result}")
             return False
@@ -364,8 +370,8 @@ async def main():
             print("Failed to enable power.")
             return 5
 
-    await client.single_write(DP_SET_VOLTAGE, SET_VOLTAGE, EB_TYPE_DOUBLE)
-    await client.single_write(DP_SET_CURRENT, SET_CURRENT, EB_TYPE_DOUBLE)
+    await client.single_write(DP_SET_VOLTAGE, SET_VOLTAGE, ebc.EB_TYPE_DOUBLE)
+    await client.single_write(DP_SET_CURRENT, SET_CURRENT, ebc.EB_TYPE_DOUBLE)
     print(f">> Set voltage = {SET_VOLTAGE} V (0x1101), current = {SET_CURRENT} A (0x1100)")
 
 
@@ -373,7 +379,7 @@ async def main():
     await polling_loop(client, hioki, interval=POLLING_INTERVAL)
 
     print(f">> Setting current to {STOP_CURRENT} A (0x{DP_SET_CURRENT:04X})...")
-    await client.single_write(DP_SET_CURRENT, STOP_CURRENT, EB_TYPE_DOUBLE)
+    await client.single_write(DP_SET_CURRENT, STOP_CURRENT, ebc.EB_TYPE_DOUBLE)
 
     print(f">> Waiting for total current to drop below {CURRENT_DROP_THRESHOLD} A...")
     for i in range(int(CURRENT_DROP_TIMEOUT)):
