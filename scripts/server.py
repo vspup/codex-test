@@ -4,6 +4,11 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+from pathlib import Path
+
+if __package__ is None or __package__ == "":  # pragma: no cover - runtime execution path
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from py.constants import cfg
 from py.services import TcpMeasurementBroker, UdpElectabuzzGateway
