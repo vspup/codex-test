@@ -26,31 +26,25 @@ HIOKI_RANGE = "1" # Диапазон измерения Hioki DM7275 (напри
 
 # === END CONFIG ===
 
-import sys
 import asyncio
-from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
-
-import electabuzz_client as ebc
-from constants import cfg
-from network_utils import connect_to_device
-from datapoint_mapping import DATA_POINT_MAPPING
-from typing import Optional
-import signal
-import serial
 import csv
-from datetime import datetime
+import signal
 import time
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
-from dm7275 import connect_dm7275, read_voltage
+import serial
 
+from .. import electabuzz_client as ebc
+from ..constants import cfg
+from ..network_utils import connect_to_device
+from ..datapoint_mapping import DATA_POINT_MAPPING
+from ..dm7275 import connect_dm7275, read_voltage
 
-from electabuzz_client import EB_TYPE_BOOL
-from electabuzz_client import EB_TYPE_UINT32
-from electabuzz_client import EB_TYPE_DOUBLE
+from ..electabuzz_client import EB_TYPE_BOOL
+from ..electabuzz_client import EB_TYPE_UINT32
+from ..electabuzz_client import EB_TYPE_DOUBLE
 
 
 DP_PM_FUSE = 0x3107
