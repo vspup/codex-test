@@ -1,6 +1,48 @@
 import asyncio
-from electabuzz_client import Client, EbResult
+from electabuzz_client import (
+    Client,
+    EbResult,
+    EB_TYPE_BOOL,
+    EB_TYPE_DOUBLE,
+    EB_TYPE_FLOAT,
+    EB_TYPE_INT32,
+    EB_TYPE_INT8,
+    EB_TYPE_UINT16,
+    EB_TYPE_UINT32,
+    EB_TYPE_UNKOWN,
+)
+from datapoint_mapping import DATA_POINT_MAPPING
 from constants import cfg
+
+TYPE_MAP = {
+    "EB_TYPE_FLOAT": EB_TYPE_FLOAT,
+    "EB_TYPE_DOUBLE": EB_TYPE_DOUBLE,
+    "EB_TYPE_UINT16": EB_TYPE_UINT16,
+    "EB_TYPE_UINT32": EB_TYPE_UINT32,
+    "EB_TYPE_INT32": EB_TYPE_INT32,
+    "EB_TYPE_INT8": EB_TYPE_INT8,
+    "EB_TYPE_BOOL": EB_TYPE_BOOL,
+    "EB_TYPE_UNKOWN": EB_TYPE_UNKOWN,
+}
+
+
+def _convert_value_for_type(type_name: str, raw_values: list[str]):
+    """Convert raw string values into Electabuzz payload respecting the DP type."""
+
+    if type_name == "EB_TYPE_BOOL":
+        def to_bool(v: str) -> bool:
+            s = v.strip().lower()
+            return s in ("1", "true", "yes", "on")
+
+        return to_bool(raw_values[0]) if len(raw_values) == 1 else [to_bool(v) for v in raw_values]
+
+    if type_name in {"EB_TYPE_UINT32", "EB_TYPE_UINT16", "EB_TYPE_INT32", "EB_TYPE_INT8"}:
+        caster = int
+    else:
+        caster = float
+
+    return caster(raw_values[0]) if len(raw_values) == 1 else [caster(v) for v in raw_values]
+
 
 async def handle_connection(reader, writer, client):
     addr = writer.get_extra_info("peername")
@@ -35,40 +77,22 @@ async def handle_connection(reader, writer, client):
 
 
             elif op == "w" and len(parts) >= 3:
-
                 dp = int(parts[1], 16)
-
-                vals = [float(v) for v in parts[2:]]
-
+                point_key = f"0x{dp:04x}"
+                type_name = DATA_POINT_MAPPING.get(point_key, {}).get("type", "EB_TYPE_DOUBLE")
+                eb_type = TYPE_MAP.get(type_name, EB_TYPE_UNKOWN)
                 try:
-
-                    c = Client()
-
-                    # создаём сокет с новым локальным портом
-
-                    await c.connect(cfg.host, cfg.port, recv_timeout_ms=cfg.recv_timeout_ms)
-
-                    # принудительно переинициализируем сокет (у asyncudp всегда новый порт)
-
-                    res = await c.single_write(dp, vals, eb_type=0x0b)
-
-                    c.close()
-
+                    value = _convert_value_for_type(type_name, parts[2:])
+                except ValueError as exc:
+                    response = f"<<< Invalid value for {type_name}: {exc}\n"
+                else:
+                    res = await client.single_write(dp, value, eb_type=eb_type)
                     if res == EbResult.EB_OK:
-
-                        response = f"<<< WROTE 0x{dp:04X} = {vals} (EB_OK)\n"
-
+                        response = f"<<< WROTE 0x{dp:04X} = {value} ({res.name})\n"
                     elif res is None:
-
-                        response = f"<<< WROTE 0x{dp:04X} = {vals} (no response)\n"
-
+                        response = f"<<< WROTE 0x{dp:04X} = {value} (no response)\n"
                     else:
-
                         response = f"<<< WRITE 0x{dp:04X} ERR {res.name}\n"
-
-                except Exception as e:
-
-                    response = f"<<< ERROR: {e}\n"
 
 
             else:
