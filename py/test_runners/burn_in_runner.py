@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-workerA.py — minimal script that connects to EB client just like id_transmiter.py,
-reads 0x3107 (PM Fuse On/Off), and prints result in English.
+burn_in_runner.py — минимальный скрипт, который подключается к Electabuzz client,
+управляет PM Fuse (0x3107) и режимом Main Mode, а также выводит результаты на экран.
 """
 
 # === CONFIGURATION ===
@@ -28,6 +28,12 @@ HIOKI_RANGE = "1" # Диапазон измерения Hioki DM7275 (напри
 
 import sys
 import asyncio
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
 import electabuzz_client as ebc
 from constants import cfg
 from network_utils import connect_to_device
@@ -37,7 +43,6 @@ import signal
 import serial
 import csv
 from datetime import datetime
-from pathlib import Path
 import time
 
 from dm7275 import connect_dm7275, read_voltage
