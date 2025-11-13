@@ -6,16 +6,20 @@ reads 0x3107 (PM Fuse On/Off), and prints result in English.
 """
 
 # === CONFIGURATION ===
-SET_VOLTAGE = 2.0 # Напряжение (0x1101), в вольтах
-SET_CURRENT = 500.0 # Ток (0x1100), в амперах
-STOP_CURRENT = 0.0 # Ток для отключения режима
-CURRENT_DROP_THRESHOLD = 0.2 # Порог тока для безопасного отключения, А
-CURRENT_DROP_TIMEOUT = 60 # Время ожидания снижения тока, сек
+SET_VOLTAGE = 2.0  # Напряжение (0x1101), в вольтах
+SET_CURRENT = 500.0  # Ток (0x1100), в амперах
+STOP_CURRENT = 0.0  # Ток для отключения режима
+CURRENT_DROP_THRESHOLD = 0.2  # Порог тока для безопасного отключения, А
+CURRENT_DROP_TIMEOUT = 60  # Время ожидания снижения тока, сек
 
-POLLING_INTERVAL = 2.0 # Интервал опроса, сек
-MAIN_MODE_TIMEOUT = 180.0 # Таймаут включения/выключения Main Mode, сек
-RETRY_DELAY = 1.0 # Задержка между попытками, сек
-MAX_ENABLE_ATTEMPTS = 3 # Максимальное количество попыток включить PM Fuse
+POLLING_INTERVAL = 2.0  # Интервал опроса, сек
+MAIN_MODE_TIMEOUT = 180.0  # Таймаут включения/выключения Main Mode, сек
+RETRY_DELAY = 1.0  # Задержка между повторными попытками, сек
+MAX_ENABLE_ATTEMPTS = 3  # Максимальное количество попыток включить PM Fuse
+MODE_POLL_INTERVAL = 5.0  # Интервал проверки режима Main Mode, сек
+MAX_VALID_OP_MODE = 5  # Максимально допустимый код режима
+SAFE_BUS_VOLTAGE_THRESHOLD = 10.0  # Порог безопасного напряжения шины, В
+CURRENT_CHECK_INTERVAL = 1.0  # Интервал проверки тока при выключении, сек
 
 HIOKI_PORT = "/dev/ttyACM0" # Последовательный порт Hioki DM7275
 HIOKI_RANGE = "1" # Диапазон измерения Hioki DM7275 (например, AUTO или 0.1)
@@ -73,7 +77,7 @@ def format_row(currents, voltage, dm7275_v=None, elapsed_s=0.0):
     return f"{time_str} | {' '.join(i_parts)} | {total:6.3f} | {u_str} | {dm_str}"
 
 
-async def polling_loop(client: ebc.Client, hioki: serial.Serial | None, interval: float = 2.0):
+async def polling_loop(client: ebc.Client, hioki: serial.Serial | None, interval: float = POLLING_INTERVAL):
     print(">> Starting measurement loop. Press Ctrl+C to stop.")
     global stop_requested
     stop_requested = False
@@ -196,7 +200,7 @@ async def read_datapoint(client: ebc.Client, dp_id: int) -> Optional[any]:
 async def enable_all_pm_modules(client: ebc.Client) -> bool:
     """Sends [True]*8 to 0x3107 to enable all PM modules."""
     try:
-        result = await client.single_write(0x3107, [True]*8, EB_TYPE_BOOL)
+        result = await client.single_write(DP_PM_FUSE, [True] * 8, EB_TYPE_BOOL)
         if result == ebc.EbResult.EB_OK:
             print(">> Sent enable command to all PM modules via 0x3107.")
             return True
@@ -228,7 +232,7 @@ async def switch_main_mode(client: ebc.Client, target_mode: int, timeout: float 
         return False
 
     print(f">> Waiting for mode confirmation in 0x{DP_OP_MODE:04X} == {target_mode}...")
-    poll_interval = 5.0
+    poll_interval = MODE_POLL_INTERVAL
     elapsed = 0.0
 
     while elapsed < timeout:
@@ -245,8 +249,10 @@ async def switch_main_mode(client: ebc.Client, target_mode: int, timeout: float 
         if actual_mode == target_mode:
             print(f">> Main mode successfully set to {target_mode}.")
             return True
-        elif isinstance(actual_mode, int) and actual_mode > 5:
-            print(f"!! Error: 0x{DP_OP_MODE:04X} = {actual_mode} (>5). Aborting.")
+        elif isinstance(actual_mode, int) and actual_mode > MAX_VALID_OP_MODE:
+            print(
+                f"!! Error: 0x{DP_OP_MODE:04X} = {actual_mode} (> {MAX_VALID_OP_MODE}). Aborting."
+            )
             return False
 
     print(f"!! Timeout: 0x{DP_OP_MODE:04X} did not become {target_mode} within {int(timeout)} seconds.")
@@ -297,8 +303,14 @@ async def main():
     print(f">> Current Operating Mode (0x2000): {op_mode}")
 
     # Check conditions
-    if isinstance(bus_voltage, (int, float)) and bus_voltage > 10:
-        print(f">>> Skipped reading 0x3107: Filtered Bus Voltage = {bus_voltage:.5f} V > 10 V.")
+    if (
+        isinstance(bus_voltage, (int, float))
+        and bus_voltage > SAFE_BUS_VOLTAGE_THRESHOLD
+    ):
+        print(
+            ">>> Skipped reading 0x3107: "
+            f"Filtered Bus Voltage = {bus_voltage:.5f} V > {SAFE_BUS_VOLTAGE_THRESHOLD:.0f} V."
+        )
         client.close()
         return 0
 
@@ -318,11 +330,11 @@ async def main():
     if not (isinstance(val, list) and all(val)):
         print(">> Some PM modules are OFF. Attempting to enable...")
 
-        for attempt in range(1, 4):  # Attempts 1 to 3
+        for attempt in range(1, MAX_ENABLE_ATTEMPTS + 1):  # Attempts 1 to MAX
             print(f">> Enable attempt {attempt}...")
             success = await enable_all_pm_modules(client)
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(RETRY_DELAY)
             val = await read_datapoint(client, DP_PM_FUSE)
             if val is None:
                 print("!! Failed to read PM Fuse state after write.")
@@ -331,10 +343,14 @@ async def main():
             print(format_pm_fuse(val))
 
             if isinstance(val, list) and all(val):
-                print(f">> All PM modules successfully enabled on attempt {attempt}.")
+                print(
+                    f">> All PM modules successfully enabled on attempt {attempt}."
+                )
                 break
         else:
-            print("!! Failed to enable all PM modules after 3 attempts.")
+            print(
+                f"!! Failed to enable all PM modules after {MAX_ENABLE_ATTEMPTS} attempts."
+            )
             return 4
 
 
@@ -346,29 +362,31 @@ async def main():
             print("Failed to enable power.")
             return 5
 
-    await client.single_write(0x1101, SET_VOLTAGE, EB_TYPE_DOUBLE)
-    await client.single_write(0x1100, SET_CURRENT, EB_TYPE_DOUBLE)
+    await client.single_write(DP_SET_VOLTAGE, SET_VOLTAGE, EB_TYPE_DOUBLE)
+    await client.single_write(DP_SET_CURRENT, SET_CURRENT, EB_TYPE_DOUBLE)
     print(f">> Set voltage = {SET_VOLTAGE} V (0x1101), current = {SET_CURRENT} A (0x1100)")
 
 
 
     await polling_loop(client, hioki, interval=POLLING_INTERVAL)
 
-    print(f">> Setting current to {STOP_CURRENT} A (0x{DP_SET_CURRENT})...")
+    print(f">> Setting current to {STOP_CURRENT} A (0x{DP_SET_CURRENT:04X})...")
     await client.single_write(DP_SET_CURRENT, STOP_CURRENT, EB_TYPE_DOUBLE)
 
     print(f">> Waiting for total current to drop below {CURRENT_DROP_THRESHOLD} A...")
     for i in range(int(CURRENT_DROP_TIMEOUT)):
-        currents = await read_datapoint(client, 0x1000)
+        currents = await read_datapoint(client, DP_CURRENT)
         if isinstance(currents, list):
             total = sum(abs(i) for i in currents)
             print(f"  Total current: {total:.3f} A")
-            if total <= 0.2:
+            if total <= CURRENT_DROP_THRESHOLD:
                 print(f">> Current dropped below {CURRENT_DROP_THRESHOLD} A.")
                 break
-        await asyncio.sleep(1)
+        await asyncio.sleep(CURRENT_CHECK_INTERVAL)
     else:
-        print("!! Timeout: Current did not drop below 0.2 A")
+        print(
+            f"!! Timeout: Current did not drop below {CURRENT_DROP_THRESHOLD} A"
+        )
 
     print(">> Switching off main mode...")
     await switch_main_mode(client, 0)
