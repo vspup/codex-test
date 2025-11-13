@@ -88,7 +88,9 @@ async def polling_loop(client: ebc.Client, hioki: serial.Serial | None, interval
 
     # --- Prepare CSV logger ---
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_path = Path(f"./log/log_{timestamp}.csv")
+    log_dir = Path("./log")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / f"log_{timestamp}.csv"
     csv_file = log_path.open("w", newline="")
     writer = csv.writer(csv_file)
     header = [
