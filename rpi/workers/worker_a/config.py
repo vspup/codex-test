@@ -1,4 +1,4 @@
-"""Configuration loading and validation for the workerA measurement script."""
+"""Configuration loading and validation for Worker A on the Raspberry Pi."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
