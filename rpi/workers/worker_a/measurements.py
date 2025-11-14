@@ -1,4 +1,4 @@
-"""Measurement loop and logging for Worker A."""
+"""Measurement loop and logging for Worker A running on Raspberry Pi."""
 from __future__ import annotations
 
 import asyncio
@@ -11,8 +11,8 @@ from typing import Optional, Protocol
 
 import electabuzz_client as ebc
 
-from config.worker_a import WorkerAConfig
-from services.worker_a_client import (
+from rpi.workers.worker_a.config import WorkerAConfig
+from rpi.service.worker_a_client import (
     DP_CURRENT,
     DP_T1,
     DP_T2,
