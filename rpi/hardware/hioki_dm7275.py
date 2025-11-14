@@ -1,4 +1,4 @@
-"""Wrapper around :mod:`dm7275` for Worker A."""
+"""Wrapper around the shared :mod:`dm7275` module for Worker A."""
 from __future__ import annotations
 
 from dataclasses import dataclass

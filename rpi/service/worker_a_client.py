@@ -1,4 +1,4 @@
-"""Client helpers for the Worker A measurement script."""
+"""Client helpers for the Worker A measurement workflow on Raspberry Pi."""
 from __future__ import annotations
 
 import asyncio
